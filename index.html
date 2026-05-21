@@ -192,7 +192,19 @@ let state = {
 
 // ─── HELPERS ──────────────────────────────────────────
 function todayStr(){ return new Date().toISOString().split("T")[0]; }
-function fmt(d){ return new Date(d+"T12:00:00").toLocaleDateString("ru-RU",{day:"2-digit",month:"2-digit",year:"2-digit"}); }
+function fmt(d){
+  if(!d) return "—";
+  // Handle dd.mm.yy or dd.mm.yyyy from Google Sheets
+  if(String(d).includes(".")){
+    const parts = String(d).split(".");
+    if(parts.length===3){
+      const day=parts[0], mon=parts[1], yr=parts[2];
+      const fullYr = yr.length===2 ? "20"+yr : yr;
+      return new Date(`${fullYr}-${mon}-${day}T12:00:00`).toLocaleDateString("ru-RU",{day:"2-digit",month:"2-digit",year:"2-digit"});
+    }
+  }
+  return new Date(d+"T12:00:00").toLocaleDateString("ru-RU",{day:"2-digit",month:"2-digit",year:"2-digit"});
+}
 function fmtN(n,dec=2){ return Number(n).toLocaleString("ru-RU",{minimumFractionDigits:dec,maximumFractionDigits:dec}); }
 function monthKey(d){ return d ? String(d).slice(0,7) : ""; }
 function monthLabel(k){
