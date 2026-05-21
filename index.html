@@ -571,13 +571,13 @@ function render(){
       ).join("")}
     </div>
 
-    ${state.tab==="summary" ? renderSummary(gStats, sStats, totalDebt) : ""}
+    ${state.tab==="summary" ? renderSummary(gStats, sStats, totalDebt, effectiveRate) : ""}
     ${state.tab==="incoming" ? renderIncoming(filteredEntries, monthsIn, incomingSummaryRows, editEntryRowHtml, previewIn) : ""}
     ${state.tab==="outgoing" ? renderOutgoing(filteredPayouts, monthsOut, outgoingSummaryRows, editPayoutRowHtml, previewOut) : ""}
   `;
 
   // helper: month select
-  function renderSummary(gStats, sStats, totalDebt){
+  function renderSummary(gStats, sStats, totalDebt, effectiveRate){
     if(!gStats.length) return `<div class="empty">Нет данных — добавь получения или нажми «Обновить» вверху</div>`;
     return `
       <div class="total-banner">
@@ -592,7 +592,11 @@ function render(){
         <div>
           <div class="tb-lbl">Общий долг</div>
           <div class="tb-val ${totalDebt>0.01?"owe":"clear"}">
-            ${totalDebt>0.01?`Женя должна ${fmtN(totalDebt)} ₽`:totalDebt<-0.01?`Жене должны ${fmtN(Math.abs(totalDebt))} ₽`:"✓ Всё закрыто"}
+            ${totalDebt>0.01
+              ? `Женя должна ${fmtN(totalDebt)} ₽` + (effectiveRate ? ` / ≈${fmtN(totalDebt/effectiveRate,0)} ₴` : '')
+              : totalDebt<-0.01
+              ? `Жене должны ${fmtN(Math.abs(totalDebt))} ₽` + (effectiveRate ? ` / ≈${fmtN(Math.abs(totalDebt)/effectiveRate,0)} ₴` : '')
+              : "✓ Всё закрыто"}
           </div>
         </div>
       </div>
@@ -603,7 +607,11 @@ function render(){
           <div class="grow"><span>Прислали</span><span>${fmtN(g.totalUah)} ₴ = ${fmtN(g.totalRubReceived)} ₽</span></div>
           <div class="grow"><span>Женя перевела</span><span>${fmtN(g.totalRubSent)} ₽</span></div>
           <div class="gdebt ${cls}">
-            ${g.debt>0.01?`Женя должна ${fmtN(g.debt)} ₽`:g.debt<-0.01?`Жене должны ${fmtN(Math.abs(g.debt))} ₽`:"✓ Расчёт закрыт"}
+            ${g.debt>0.01
+              ? `Женя должна ${fmtN(g.debt)} ₽` + (effectiveRate ? ` / ≈ ${fmtN(g.debt/effectiveRate,0)} ₴` : '')
+              : g.debt<-0.01
+              ? `Жене должны ${fmtN(Math.abs(g.debt))} ₽` + (effectiveRate ? ` / ≈ ${fmtN(Math.abs(g.debt)/effectiveRate,0)} ₴` : '')
+              : "✓ Расчёт закрыт"}
           </div>
           ${g.members.length>1?`<div class="detail">
             ${g.members.map(m=>{
