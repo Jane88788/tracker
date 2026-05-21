@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<title>💸 UAH → RUB Трекер</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Unbounded:wght@400;700;900&display=swap" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{min-height:100vh;background:#f5f2ed;font-family:'DM Mono','Courier New',monospace;color:#1a1a1a;}
+
+.hdr{background:#1a1a1a;padding:16px 20px;display:flex;justify-content:space-between;align-items:center;}
+.hdr-left .hdr-title{font-family:'Unbounded',sans-serif;font-size:11px;font-weight:900;letter-spacing:.15em;color:#f0c14b;text-transform:uppercase;}
+.hdr-left .hdr-sub{font-size:10px;color:#555;margin-top:2px;}
+.sync-btn{background:none;border:1px solid #333;border-radius:6px;padding:7px 12px;font-family:'DM Mono',monospace;font-size:10px;color:#666;cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:6px;}
+.sync-btn:hover{border-color:#f0c14b;color:#f0c14b;}
+.sync-btn.loading{color:#f0c14b;border-color:#f0c14b;animation:pulse 1s infinite;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.5;}}
+.sync-status{font-size:9px;color:#444;margin-top:3px;text-align:right;}
+
+.wrap{max-width:900px;margin:0 auto;padding:16px 14px;}
+
+/* Rate block */
+.rate-block{background:#fff;border:1.5px solid #e0dbd2;border-radius:10px;padding:14px 16px;margin-bottom:14px;}
+.rb-title{font-family:'Unbounded',sans-serif;font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#aaa;margin-bottom:10px;}
+.rate-row{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;}
+.rate-field{flex:1;min-width:120px;}
+.rate-field label{display:block;font-size:9px;letter-spacing:.1em;color:#aaa;text-transform:uppercase;margin-bottom:5px;}
+.rate-field input{width:100%;border:1.5px solid #e0dbd2;border-radius:6px;padding:9px 11px;font-family:'DM Mono',monospace;font-size:16px;color:#1a1a1a;background:#fafaf8;outline:none;transition:border-color .15s;}
+.rate-field input:focus{border-color:#1a1a1a;}
+.rate-field input::placeholder{color:#ccc;}
+.rate-eq{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding-bottom:10px;color:#ccc;font-size:16px;}
+.rate-result{flex:1;min-width:120px;background:#1a1a1a;border-radius:8px;padding:10px 14px;}
+.rate-result-lbl{font-size:9px;color:#555;letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px;}
+.rate-result-val{font-size:20px;font-weight:500;color:#f0c14b;}
+.rate-result-sub{font-size:9px;color:#444;margin-top:2px;}
+
+/* Tabs */
+.tabs{display:flex;border:1.5px solid #e0dbd2;border-radius:8px;overflow:hidden;background:#fff;margin-bottom:14px;}
+.tab-btn{flex:1;padding:11px 6px;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.06em;text-transform:uppercase;border:none;background:transparent;cursor:pointer;color:#aaa;transition:all .15s;border-right:1px solid #e0dbd2;}
+.tab-btn:last-child{border-right:none;}
+.tab-btn.active{background:#1a1a1a;color:#f0c14b;}
+
+/* Summary */
+.total-banner{background:#1a1a1a;border-radius:10px;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;}
+.tb-lbl{font-size:9px;color:#666;letter-spacing:.1em;text-transform:uppercase;margin-bottom:2px;}
+.tb-val{font-size:20px;font-weight:500;}
+.tb-val.owe{color:#f0c14b;}.tb-val.clear{color:#4caf7d;}
+
+.gcard{background:#fff;border:1.5px solid #e0dbd2;border-radius:10px;padding:16px;margin-bottom:10px;}
+.gcard-title{font-size:15px;font-weight:500;margin-bottom:10px;display:flex;align-items:center;gap:8px;}
+.grow{display:flex;justify-content:space-between;font-size:12px;padding:3px 0;color:#aaa;}
+.grow span:last-child{color:#1a1a1a;font-weight:500;}
+.gdebt{margin-top:10px;padding:9px 12px;border-radius:6px;text-align:center;font-size:13px;font-weight:500;}
+.gdebt.owe{background:#fff3cd;color:#7a5800;}
+.gdebt.paid{background:#d4edda;color:#155724;}
+.gdebt.over{background:#d1ecf1;color:#0c5460;}
+.detail{margin-top:10px;border-top:1px solid #f0ede8;padding-top:10px;}
+.detail-row{display:flex;justify-content:space-between;font-size:11px;padding:3px 0;}
+.detail-row span:first-child{color:#aaa;}
+
+/* Form */
+.form-box{background:#fff;border:1.5px solid #e0dbd2;border-radius:10px;padding:16px;margin-bottom:12px;}
+.form-title{font-family:'Unbounded',sans-serif;font-size:9px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#aaa;margin-bottom:10px;}
+.fg{display:grid;gap:10px;margin-bottom:10px;}
+.fg4{grid-template-columns:120px 1fr 1fr 1fr;}
+.fl label{display:block;font-size:9px;letter-spacing:.1em;color:#aaa;text-transform:uppercase;margin-bottom:4px;}
+.fl input,.fl select{width:100%;border:1.5px solid #e0dbd2;border-radius:6px;padding:8px 10px;font-family:'DM Mono',monospace;font-size:13px;color:#1a1a1a;background:#fafaf8;outline:none;transition:border-color .15s;}
+.fl input:focus,.fl select:focus{border-color:#1a1a1a;}
+.fl input::placeholder{color:#ccc;}
+
+.preview{background:#fafaf8;border:1.5px solid #e0dbd2;border-radius:6px;padding:10px 14px;margin-bottom:10px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:12px;}
+.pv{color:#1a1a1a;font-weight:500;}.pg{color:#aaa;font-size:11px;}.parr{color:#ccc;font-size:14px;}.pv-big{font-size:18px;font-weight:500;color:#1a1a1a;}
+
+.btn-add{width:100%;background:#1a1a1a;color:#f0c14b;border:none;border-radius:6px;padding:12px;font-family:'Unbounded',sans-serif;font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;transition:all .15s;}
+.btn-add:hover{background:#333;}
+.btn-add:disabled{opacity:.5;cursor:not-allowed;}
+.btn-add.green{background:#1d5c38;color:#7fffc4;}
+.btn-add.green:hover{background:#256545;}
+
+/* Filter bar */
+.filter-bar{display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap;}
+.filter-lbl{font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:#aaa;}
+.filter-select{border:1.5px solid #e0dbd2;border-radius:6px;padding:7px 10px;font-family:'DM Mono',monospace;font-size:12px;color:#1a1a1a;background:#fff;outline:none;cursor:pointer;}
+.filter-clear{font-size:10px;color:#aaa;background:none;border:1px solid #e0dbd2;border-radius:5px;padding:5px 10px;cursor:pointer;font-family:'DM Mono',monospace;}
+.filter-clear:hover{color:#1a1a1a;border-color:#1a1a1a;}
+
+/* Table */
+.tbl-wrap{background:#fff;border:1.5px solid #e0dbd2;border-radius:10px;overflow:hidden;margin-bottom:12px;}
+.tbl-hdr{padding:11px 14px;border-bottom:1.5px solid #f0ede8;display:flex;justify-content:space-between;align-items:center;}
+.tbl-hdr-t{font-family:'Unbounded',sans-serif;font-size:9px;font-weight:700;letter-spacing:.13em;text-transform:uppercase;color:#aaa;}
+.tbl-wrap-scroll{overflow-x:auto;}
+.tbl{width:100%;border-collapse:collapse;font-size:11px;}
+.tbl th{font-size:9px;letter-spacing:.07em;text-transform:uppercase;color:#aaa;text-align:left;padding:7px 10px;border-bottom:1.5px solid #e0dbd2;font-weight:400;white-space:nowrap;}
+.tbl td{padding:9px 10px;border-bottom:1px solid #f0ede8;vertical-align:middle;}
+.tbl tr:last-child td{border-bottom:none;}
+.tbl tr:hover td{background:#fafaf8;}
+.tbl tr.editing td{background:#fff8e1!important;}
+.chain-cell{color:#aaa;font-size:10px;white-space:nowrap;}
+.del-btn{background:none;border:none;color:#ddd;cursor:pointer;font-size:15px;transition:color .15s;padding:2px 4px;}
+.del-btn:hover{color:#e05c5c;}
+.edit-btn{background:none;border:none;color:#bbb;cursor:pointer;font-size:13px;transition:color .15s;padding:2px 4px;}
+.edit-btn:hover{color:#1a1a1a;}
+.save-btn{background:#1a1a1a;color:#f0c14b;border:none;border-radius:4px;padding:5px 9px;font-size:10px;cursor:pointer;font-family:'DM Mono',monospace;}
+.cancel-btn{background:none;border:1px solid #ddd;border-radius:4px;padding:5px 9px;font-size:10px;cursor:pointer;font-family:'DM Mono',monospace;margin-left:4px;color:#aaa;}
+.empty{text-align:center;padding:28px;color:#ccc;font-size:11px;}
+
+/* Inline edit */
+.edit-input{border:1.5px solid #f0c14b;border-radius:4px;padding:4px 7px;font-family:'DM Mono',monospace;font-size:12px;color:#1a1a1a;background:#fffdf0;outline:none;}
+.edit-select{border:1.5px solid #f0c14b;border-radius:4px;padding:4px 7px;font-family:'DM Mono',monospace;font-size:12px;color:#1a1a1a;background:#fffdf0;outline:none;}
+
+/* Summary rows inside table */
+.summary-row td{font-weight:500;font-size:11px;border-top:2px solid #e0dbd2!important;}
+.summary-row.owe td{background:#fff3cd!important;}
+.summary-row.paid td{background:#d4edda!important;}
+.summary-row.over td{background:#d1ecf1!important;}
+
+/* Toast */
+.toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#1a1a1a;border-radius:6px;padding:10px 18px;font-size:11px;color:#e8e3d5;z-index:9999;white-space:nowrap;max-width:92vw;animation:toastIn .2s ease;}
+.toast.error{background:#5c1a1a;color:#ffb3b3;}
+.toast.info{background:#1a3a5c;color:#b3d4ff;}
+@keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(8px);}to{opacity:1;transform:translateX(-50%) translateY(0);}}
+
+/* Loading overlay */
+.loading-overlay{position:fixed;inset:0;background:rgba(245,242,237,.85);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9998;gap:12px;}
+.spinner{width:32px;height:32px;border:3px solid #e0dbd2;border-top-color:#1a1a1a;border-radius:50%;animation:spin .7s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.loading-text{font-size:11px;color:#aaa;letter-spacing:.1em;}
+
+@media(max-width:600px){
+  .fg4{grid-template-columns:1fr 1fr;}
+  .fg4>*:first-child{grid-column:1/-1;}
+  .rate-row{flex-direction:column;}
+  .chain-cell{display:none;}
+  .hdr{flex-direction:column;align-items:flex-start;gap:8px;}
+}
+</style>
+</head>
+<body>
+
+<div id="loading-overlay" class="loading-overlay">
+  <div class="spinner"></div>
+  <div class="loading-text">Загружаем данные из таблицы…</div>
+</div>
+
+<div class="hdr">
+  <div class="hdr-left">
+    <div class="hdr-title">💸 UAH → $ → RUB</div>
+    <div class="hdr-sub">трекер переводов</div>
+  </div>
+  <div style="text-align:right">
+    <button class="sync-btn" id="sync-btn" onclick="syncFromSheet()">
+      <span id="sync-icon">⟳</span> Обновить
+    </button>
+    <div class="sync-status" id="sync-status"></div>
+  </div>
+</div>
+
+<div class="wrap" id="app"></div>
+<div id="toasts"></div>
+
+<script>
+// ─── CONFIG ───────────────────────────────────────────
+const WEBHOOK = "https://script.google.com/macros/s/AKfycbx39SPsEamQf62vfF7bM59hlXroysNxX53kvlNjd1iZwkrV6Cpx0YcsiFB2OzcqLPQE/exec";
+const STORAGE_KEY = "uah_rub_v8";
+
+const SENDERS = ["Мама","Папа","Бабушка","Дедушка","Другие"];
+const EMOJI = {"Мама":"👩","Папа":"👨","Бабушка":"👵","Дедушка":"👴","Другие":"🤝"};
+const GROUPS = [
+  {label:"Родители",      emoji:"👨‍👩", members:["Мама","Папа"]},
+  {label:"Бабушка и Дедушка", emoji:"👴👵", members:["Бабушка","Дедушка"]},
+  {label:"Другие",        emoji:"🤝",  members:["Другие"]},
+];
+const MONTHS_RU = ["Январь","Февраль","Март","Апрель","Май","Июнь","Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь"];
+
+// ─── STATE ────────────────────────────────────────────
+let state = {
+  entries: [],
+  payouts: [],
+  monoRate:    localStorage.getItem("monoRate")    || "",
+  tinkoffRate: localStorage.getItem("tinkoffRate") || "",
+  tab: "summary",
+  // forms
+  date: todayStr(), sender: "Мама", uah: "", note: "",
+  payDate: todayStr(), payTo: "Мама", payRub: "", payNote: "",
+  // filters
+  filterMonthIn: "", filterMonthOut: "",
+  // editing
+  editingEntryId: null, editEntry: {},
+  editingPayoutId: null, editPayout: {},
+};
+
+// ─── HELPERS ──────────────────────────────────────────
+function todayStr(){ return new Date().toISOString().split("T")[0]; }
+function fmt(d){ return new Date(d+"T12:00:00").toLocaleDateString("ru-RU",{day:"2-digit",month:"2-digit",year:"2-digit"}); }
+function fmtN(n,dec=2){ return Number(n).toLocaleString("ru-RU",{minimumFractionDigits:dec,maximumFractionDigits:dec}); }
+function monthKey(d){ return d ? String(d).slice(0,7) : ""; }
+function monthLabel(k){
+  if(!k) return "";
+  const [y,m] = k.split("-");
+  return MONTHS_RU[parseInt(m)-1] + " " + y;
+}
+function getMono(){ return parseFloat(state.monoRate)||0; }
+function getTinkoff(){ return parseFloat(state.tinkoffRate)||0; }
+function ratesOk(){ return getMono()>0 && getTinkoff()>0; }
+
+function calcToRub(uah){
+  if(!ratesOk()||!uah) return null;
+  const usd = uah/getMono();
+  return {usd:parseFloat(usd.toFixed(4)), rub:parseFloat((usd*getTinkoff()).toFixed(2))};
+}
+function calcToUah(rub){
+  if(!ratesOk()||!rub) return null;
+  const usd = rub/getTinkoff();
+  return {usd:parseFloat(usd.toFixed(4)), uah:parseFloat((usd*getMono()).toFixed(2))};
+}
+
+// ─── PERSIST LOCAL ────────────────────────────────────
+function persist(){
+  try{ localStorage.setItem(STORAGE_KEY, JSON.stringify({entries:state.entries, payouts:state.payouts})); } catch{}
+}
+function loadLocal(){
+  try{
+    const s = localStorage.getItem(STORAGE_KEY);
+    if(s){ const p=JSON.parse(s); state.entries=p.entries||[]; state.payouts=p.payouts||[]; }
+  } catch{}
+}
+
+// ─── GOOGLE SHEETS ────────────────────────────────────
+async function syncFromSheet(){
+  const btn = document.getElementById("sync-btn");
+  const icon = document.getElementById("sync-icon");
+  const status = document.getElementById("sync-status");
+  btn.classList.add("loading");
+  icon.textContent = "↻";
+  status.textContent = "Синхронизация…";
+  try {
+    const res = await fetch(WEBHOOK + "?t=" + Date.now());
+    const data = await res.json();
+
+    // incoming: [rowId, date, sender, uah, monoRate, usd, tinkoffRate, rub, note]
+    if(data.incoming && data.incoming.length){
+      state.entries = data.incoming.map(r=>({
+        id:          String(r[0]||"").trim() || ("gs_"+Math.random()),
+        date:        String(r[1]||"").trim(),
+        sender:      String(r[2]||"").trim(),
+        uah:         parseFloat(r[3])||0,
+        monoRate:    parseFloat(r[4])||0,
+        usd:         parseFloat(r[5])||0,
+        tinkoffRate: parseFloat(r[6])||0,
+        rub:         parseFloat(r[7])||0,
+        note:        String(r[8]||"").trim(),
+      })).reverse();
+    }
+
+    // outgoing: [rowId, date, to, rub, tinkoffRate, usd, monoRate, uah, note]
+    if(data.outgoing && data.outgoing.length){
+      state.payouts = data.outgoing.map(r=>({
+        id:          String(r[0]||"").trim() || ("gs_"+Math.random()),
+        date:        String(r[1]||"").trim(),
+        to:          String(r[2]||"").trim(),
+        rub:         parseFloat(r[3])||0,
+        tinkoffRate: parseFloat(r[4])||0,
+        usd:         parseFloat(r[5])||0,
+        monoRate:    parseFloat(r[6])||0,
+        uah:         parseFloat(r[7])||0,
+        note:        String(r[8]||"").trim(),
+      })).reverse();
+    }
+
+    persist();
+    status.textContent = "Обновлено: " + new Date().toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit"});
+    showToast("Данные загружены из Google Sheets ✓", "info");
+  } catch(e){
+    status.textContent = "Ошибка синхронизации";
+    showToast("Не удалось загрузить из таблицы", "error");
+  }
+  btn.classList.remove("loading");
+  icon.textContent = "⟳";
+  render();
+}
+
+async function sendToSheet(payload){
+  try{
+    await fetch(WEBHOOK, {method:"POST", mode:"no-cors", headers:{"Content-Type":"application/json"}, body:JSON.stringify(payload)});
+    return true;
+  } catch{ return false; }
+}
+
+// ─── ACTIONS ──────────────────────────────────────────
+async function addEntry(){
+  const uahVal = parseFloat(state.uah);
+  const chain = calcToRub(uahVal);
+  if(!chain||!uahVal){ showToast(ratesOk()?"Введи сумму":"Введи курсы вверху","error"); return; }
+  const rowId = String(Date.now());
+  const entry = {
+    id: rowId,
+    date: state.date, sender: state.sender,
+    uah: uahVal, monoRate: getMono(),
+    usd: chain.usd, tinkoffRate: getTinkoff(),
+    rub: chain.rub, note: state.note,
+  };
+  state.entries = [entry, ...state.entries];
+  state.uah = ""; state.note = "";
+  persist(); render(); showToast("Записано ✓");
+  await sendToSheet({
+    sheet:"Получения", rowId,
+    date:fmt(entry.date), sender:entry.sender,
+    uah:entry.uah, monoRate:entry.monoRate,
+    usd:entry.usd, tinkoffRate:entry.tinkoffRate,
+    rub:entry.rub, note:entry.note,
+  });
+}
+
+async function addPayout(){
+  const rubVal = parseFloat(state.payRub);
+  if(!rubVal){ showToast("Введи сумму","error"); return; }
+  const chain = calcToUah(rubVal);
+  const rowId = String(Date.now());
+  const payout = {
+    id: rowId,
+    date: state.payDate, to: state.payTo,
+    rub: rubVal, tinkoffRate: getTinkoff(),
+    usd: chain?.usd||0, monoRate: getMono(),
+    uah: chain?.uah||0, note: state.payNote,
+  };
+  state.payouts = [payout, ...state.payouts];
+  state.payRub = ""; state.payNote = "";
+  persist(); render(); showToast("Перевод записан ✓");
+  await sendToSheet({
+    sheet:"Переводы", rowId,
+    date:fmt(payout.date), to:payout.to,
+    rub:payout.rub, tinkoffRate:payout.tinkoffRate,
+    usd:payout.usd, monoRate:payout.monoRate,
+    uah:payout.uah, note:payout.note,
+  });
+}
+
+async function delEntry(id){
+  if(!confirm("Удалить запись из трекера и Google Sheets?")) return;
+  state.entries = state.entries.filter(x=>x.id!=id);
+  persist(); render();
+  await sendToSheet({action:"delete", sheet:"Получения", rowId:String(id)});
+  showToast("Удалено ✓");
+}
+async function delPayout(id){
+  if(!confirm("Удалить запись из трекера и Google Sheets?")) return;
+  state.payouts = state.payouts.filter(x=>x.id!=id);
+  persist(); render();
+  await sendToSheet({action:"delete", sheet:"Переводы", rowId:String(id)});
+  showToast("Удалено ✓");
+}
+
+// edit entry
+function startEditEntry(id){
+  const e = state.entries.find(x=>x.id==id);
+  state.editingEntryId = id; state.editEntry = {...e}; render();
+}
+function cancelEditEntry(){ state.editingEntryId=null; render(); }
+async function saveEditEntry(id){
+  const uahVal = parseFloat(state.editEntry.uah)||0;
+  const mono = parseFloat(state.editEntry.monoRate)||getMono();
+  const tink = parseFloat(state.editEntry.tinkoffRate)||getTinkoff();
+  const usd  = parseFloat((uahVal/mono).toFixed(4));
+  const rub  = parseFloat((usd*tink).toFixed(2));
+  const updated = {...state.editEntry, uah:uahVal, monoRate:mono, tinkoffRate:tink, usd, rub};
+  state.entries = state.entries.map(e => e.id==id ? {...e, ...updated} : e);
+  state.editingEntryId=null; persist(); render(); showToast("Сохраняем в таблице…","info");
+  await sendToSheet({
+    action:"update", sheet:"Получения", rowId:String(id),
+    date:fmt(updated.date), sender:updated.sender,
+    uah:updated.uah, monoRate:updated.monoRate,
+    usd:updated.usd, tinkoffRate:updated.tinkoffRate,
+    rub:updated.rub, note:updated.note,
+  });
+  showToast("Изменено ✓");
+}
+
+// edit payout
+function startEditPayout(id){
+  const p = state.payouts.find(x=>x.id==id);
+  state.editingPayoutId=id; state.editPayout={...p}; render();
+}
+function cancelEditPayout(){ state.editingPayoutId=null; render(); }
+async function saveEditPayout(id){
+  const rubVal = parseFloat(state.editPayout.rub)||0;
+  const chain  = calcToUah(rubVal);
+  const updated = {...state.editPayout, rub:rubVal, usd:chain?.usd||state.editPayout.usd, uah:chain?.uah||state.editPayout.uah};
+  state.payouts = state.payouts.map(p => p.id==id ? {...p, ...updated} : p);
+  state.editingPayoutId=null; persist(); render(); showToast("Сохраняем в таблице…","info");
+  await sendToSheet({
+    action:"update", sheet:"Переводы", rowId:String(id),
+    date:fmt(updated.date), to:updated.to,
+    rub:updated.rub, tinkoffRate:updated.tinkoffRate,
+    usd:updated.usd, monoRate:updated.monoRate,
+    uah:updated.uah, note:updated.note,
+  });
+  showToast("Изменено ✓");
+}
+
+// ─── STATS ────────────────────────────────────────────
+function calcGroupStats(entries, payouts){
+  return GROUPS.map(g=>{
+    const rec = entries.filter(e=>g.members.includes(e.sender));
+    const totalUah = rec.reduce((a,e)=>a+e.uah,0);
+    const totalRubReceived = rec.reduce((a,e)=>a+e.rub,0);
+    const totalRubSent = payouts.filter(p=>g.members.includes(p.to)).reduce((a,p)=>a+p.rub,0);
+    const debt = totalRubReceived - totalRubSent;
+    const hasData = rec.length>0 || payouts.some(p=>g.members.includes(p.to));
+    return {...g, totalUah, totalRubReceived, totalRubSent, debt, hasData};
+  }).filter(g=>g.hasData);
+}
+function calcSenderStats(entries, payouts){
+  return SENDERS.map(s=>{
+    const rec = entries.filter(e=>e.sender===s);
+    const totalUah = rec.reduce((a,e)=>a+e.uah,0);
+    const totalRubReceived = rec.reduce((a,e)=>a+e.rub,0);
+    const totalRubSent = payouts.filter(p=>p.to===s).reduce((a,p)=>a+p.rub,0);
+    return {sender:s, totalUah, totalRubReceived, totalRubSent, debt:totalRubReceived-totalRubSent};
+  });
+}
+
+function getMonthOptions(arr, field="date"){
+  const keys = [...new Set(arr.map(x=>monthKey(x[field])))].filter(Boolean).sort().reverse();
+  return keys;
+}
+
+// ─── TOAST ────────────────────────────────────────────
+function showToast(msg, type="success"){
+  const c = document.getElementById("toasts");
+  const t = document.createElement("div");
+  t.className = "toast" + (type==="error"?" error":type==="info"?" info":"");
+  t.textContent = msg;
+  c.appendChild(t);
+  setTimeout(()=>t.remove(), 3200);
+}
+
+// ─── RENDER ───────────────────────────────────────────
+function render(){
+  const app = document.getElementById("app");
+  const effectiveRate = ratesOk() ? parseFloat((getTinkoff()/getMono()).toFixed(4)) : null;
+  const previewIn  = calcToRub(parseFloat(state.uah));
+  const previewOut = calcToUah(parseFloat(state.payRub));
+
+  // filtered
+  const filteredEntries = state.filterMonthIn
+    ? state.entries.filter(e=>monthKey(e.date)===state.filterMonthIn)
+    : state.entries;
+  const filteredPayouts = state.filterMonthOut
+    ? state.payouts.filter(p=>monthKey(p.date)===state.filterMonthOut)
+    : state.payouts;
+
+  const gStats     = calcGroupStats(state.entries, state.payouts);
+  const sStats     = calcSenderStats(state.entries, state.payouts);
+  const totalDebt  = gStats.reduce((a,g)=>a+g.debt,0);
+  const monthsIn   = getMonthOptions(state.entries);
+  const monthsOut  = getMonthOptions(state.payouts);
+
+  // ── helpers ──
+  function monthSelectHtml(months, current, onchange){
+    return `<select class="filter-select" onchange="${onchange}">
+      <option value="">Все месяцы</option>
+      ${months.map(m=>`<option value="${m}"${current===m?" selected":""}>${monthLabel(m)}</option>`).join("")}
+    </select>`;
+  }
+
+  function incomingSummaryRows(){
+    return GROUPS.map(g=>{
+      const rec = filteredEntries.filter(e=>g.members.includes(e.sender));
+      if(!rec.length) return "";
+      const totalUah = rec.reduce((a,e)=>a+e.uah,0);
+      const totalRub = rec.reduce((a,e)=>a+e.rub,0);
+      const totalSent = state.payouts.filter(p=>g.members.includes(p.to)).reduce((a,p)=>a+p.rub,0);
+      const debt = totalRub - totalSent;
+      const cls = debt>0.01?"owe":debt<-0.01?"over":"paid";
+      const debtLabel = debt>0.01?`Я должна: ${fmtN(debt)} ₽`:debt<-0.01?`Мне должны: ${fmtN(Math.abs(debt))} ₽`:"✓ Расчёт закрыт";
+      const debtColor = debt>0.01?"#7a5800":debt<-0.01?"#0c5460":"#155724";
+      return `<tr class="summary-row ${cls}">
+        <td colspan="2">${g.emoji} ${g.label}</td>
+        <td>${fmtN(totalUah)} ₴</td>
+        <td class="chain-cell">итого</td>
+        <td style="font-weight:600">${fmtN(totalRub)} ₽</td>
+        <td style="color:${debtColor};font-size:11px">${debtLabel}</td>
+        <td></td>
+      </tr>`;
+    }).join("");
+  }
+
+  function outgoingSummaryRows(){
+    return GROUPS.map(g=>{
+      const pays = filteredPayouts.filter(p=>g.members.includes(p.to));
+      if(!pays.length) return "";
+      const totalRub = pays.reduce((a,p)=>a+p.rub,0);
+      const totalUah = pays.reduce((a,p)=>a+p.uah,0);
+      const totalReceived = state.entries.filter(e=>g.members.includes(e.sender)).reduce((a,e)=>a+e.rub,0);
+      const debt = totalReceived - totalRub;
+      const cls = debt>0.01?"owe":debt<-0.01?"over":"paid";
+      const debtLabel = debt>0.01?`Ещё должна: ${fmtN(debt)} ₽`:debt<-0.01?`Переплата: ${fmtN(Math.abs(debt))} ₽`:"✓ Расчёт закрыт";
+      const debtColor = debt>0.01?"#7a5800":debt<-0.01?"#0c5460":"#155724";
+      return `<tr class="summary-row ${cls}">
+        <td colspan="2">${g.emoji} ${g.label}</td>
+        <td style="font-weight:600">${fmtN(totalRub)} ₽</td>
+        <td style="color:${debtColor};font-size:11px">${debtLabel}</td>
+        <td style="color:#aaa">${fmtN(totalUah)} ₴</td>
+        <td></td>
+      </tr>`;
+    }).join("");
+  }
+
+  function editEntryRowHtml(e){
+    return `<tr class="editing">
+      <td><input class="edit-input" type="date" value="${e.date}" oninput="state.editEntry.date=this.value" style="width:130px"/></td>
+      <td><select class="edit-select" onchange="state.editEntry.sender=this.value">${SENDERS.map(s=>`<option${state.editEntry.sender===s?" selected":""}>${s}</option>`).join("")}</select></td>
+      <td><input class="edit-input" type="number" value="${e.uah}" oninput="state.editEntry.uah=this.value" style="width:80px"/> ₴</td>
+      <td class="chain-cell" style="display:table-cell">
+        М:<input class="edit-input" type="number" value="${state.editEntry.monoRate}" oninput="state.editEntry.monoRate=this.value" style="width:52px"/>
+        Т:<input class="edit-input" type="number" value="${state.editEntry.tinkoffRate}" oninput="state.editEntry.tinkoffRate=this.value" style="width:52px"/>
+      </td>
+      <td>${fmtN(e.rub)} ₽</td>
+      <td><input class="edit-input" type="text" value="${e.note||""}" oninput="state.editEntry.note=this.value" style="width:100%"/></td>
+      <td style="white-space:nowrap">
+        <button class="save-btn" onclick="saveEditEntry(${e.id})">✓</button>
+        <button class="cancel-btn" onclick="cancelEditEntry()">✕</button>
+      </td>
+    </tr>`;
+  }
+
+  function editPayoutRowHtml(p){
+    return `<tr class="editing">
+      <td><input class="edit-input" type="date" value="${p.date}" oninput="state.editPayout.date=this.value" style="width:130px"/></td>
+      <td><select class="edit-select" onchange="state.editPayout.to=this.value">${SENDERS.map(s=>`<option${state.editPayout.to===s?" selected":""}>${s}</option>`).join("")}</select></td>
+      <td><input class="edit-input" type="number" value="${p.rub}" oninput="state.editPayout.rub=this.value" style="width:90px"/> ₽</td>
+      <td style="color:#aaa">${fmtN(p.uah)} ₴</td>
+      <td><input class="edit-input" type="text" value="${p.note||""}" oninput="state.editPayout.note=this.value" style="width:100%"/></td>
+      <td style="white-space:nowrap">
+        <button class="save-btn" onclick="saveEditPayout(${p.id})">✓</button>
+        <button class="cancel-btn" onclick="cancelEditPayout()">✕</button>
+      </td>
+    </tr>`;
+  }
+
+  // ── main HTML ──
+  app.innerHTML = `
+    <!-- Курсы -->
+    <div class="rate-block">
+      <div class="rb-title">Курс обмена — вводи актуальный</div>
+      <div class="rate-row">
+        <div class="rate-field">
+          <label>Монобанк UAH/$</label>
+          <input type="number" placeholder="44" value="${state.monoRate}" oninput="state.monoRate=this.value;localStorage.setItem('monoRate',this.value);render()"/>
+          <div style="font-size:9px;color:#bbb;margin-top:3px">₴ за 1 $</div>
+        </div>
+        <div class="rate-eq">÷ ×</div>
+        <div class="rate-field">
+          <label>Тинькофф USD/RUB</label>
+          <input type="number" placeholder="70" value="${state.tinkoffRate}" oninput="state.tinkoffRate=this.value;localStorage.setItem('tinkoffRate',this.value);render()"/>
+          <div style="font-size:9px;color:#bbb;margin-top:3px">₽ за 1 $</div>
+        </div>
+        <div class="rate-eq">=</div>
+        <div class="rate-result">
+          <div class="rate-result-lbl">UAH → RUB</div>
+          <div class="rate-result-val">${effectiveRate ?? "—"}</div>
+          <div class="rate-result-sub">₽ за 1 ₴</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      ${[["summary","📊 Итого"],["incoming","📥 Получения"],["outgoing","📤 Переводы"]].map(([k,l])=>
+        `<button class="tab-btn${state.tab===k?" active":""}" onclick="state.tab='${k}';render()">${l}</button>`
+      ).join("")}
+    </div>
+
+    ${state.tab==="summary" ? renderSummary(gStats, sStats, totalDebt) : ""}
+    ${state.tab==="incoming" ? renderIncoming(filteredEntries, monthsIn, incomingSummaryRows, editEntryRowHtml, previewIn) : ""}
+    ${state.tab==="outgoing" ? renderOutgoing(filteredPayouts, monthsOut, outgoingSummaryRows, editPayoutRowHtml, previewOut) : ""}
+  `;
+
+  // helper: month select
+  function renderSummary(gStats, sStats, totalDebt){
+    if(!gStats.length) return `<div class="empty">Нет данных — добавь получения или нажми «Обновить» вверху</div>`;
+    return `
+      <div class="total-banner">
+        <div>
+          <div class="tb-lbl">Всего получено</div>
+          <div class="tb-val" style="color:#e8e3d5">${fmtN(gStats.reduce((a,g)=>a+g.totalRubReceived,0))} ₽</div>
+        </div>
+        <div>
+          <div class="tb-lbl">Всего переведено</div>
+          <div class="tb-val" style="color:#e8e3d5">${fmtN(gStats.reduce((a,g)=>a+g.totalRubSent,0))} ₽</div>
+        </div>
+        <div>
+          <div class="tb-lbl">Общий долг</div>
+          <div class="tb-val ${totalDebt>0.01?"owe":"clear"}">
+            ${totalDebt>0.01?`Я должна ${fmtN(totalDebt)} ₽`:totalDebt<-0.01?`Мне должны ${fmtN(Math.abs(totalDebt))} ₽`:"✓ Всё закрыто"}
+          </div>
+        </div>
+      </div>
+      ${gStats.map(g=>{
+        const cls = g.debt>0.01?"owe":g.debt<-0.01?"over":"paid";
+        return `<div class="gcard">
+          <div class="gcard-title">${g.emoji} ${g.label}</div>
+          <div class="grow"><span>Прислали</span><span>${fmtN(g.totalUah)} ₴ = ${fmtN(g.totalRubReceived)} ₽</span></div>
+          <div class="grow"><span>Ты перевела</span><span>${fmtN(g.totalRubSent)} ₽</span></div>
+          <div class="gdebt ${cls}">
+            ${g.debt>0.01?`Я должна ${fmtN(g.debt)} ₽`:g.debt<-0.01?`Мне должны ${fmtN(Math.abs(g.debt))} ₽`:"✓ Расчёт закрыт"}
+          </div>
+          ${g.members.length>1?`<div class="detail">
+            ${g.members.map(m=>{
+              const s=sStats.find(x=>x.sender===m);
+              if(!s||(s.totalRubReceived===0&&s.totalRubSent===0)) return "";
+              return `<div class="detail-row">
+                <span>${EMOJI[m]} ${m}: ${fmtN(s.totalUah)} ₴ → ${fmtN(s.totalRubReceived)} ₽, переведено ${fmtN(s.totalRubSent)} ₽</span>
+                <span style="color:${s.debt>0.01?"#b8860b":s.debt<-0.01?"#0c5460":"#155724"}">
+                  ${s.debt>0.01?`−${fmtN(s.debt)} ₽`:s.debt<-0.01?`+${fmtN(Math.abs(s.debt))} ₽`:"✓"}
+                </span>
+              </div>`;
+            }).join("")}
+          </div>`:""}
+        </div>`;
+      }).join("")}
+    `;
+  }
+
+  function renderIncoming(filtered, months, summaryFn, editRowFn, previewIn){
+    return `
+      <div class="form-box">
+        <div class="form-title">Записать получение</div>
+        <div class="fg fg4">
+          <div class="fl"><label>Дата</label><input type="date" value="${state.date}" oninput="state.date=this.value"/></div>
+          <div class="fl"><label>От кого</label><select onchange="state.sender=this.value">${SENDERS.map(s=>`<option${state.sender===s?" selected":""}>${s}</option>`).join("")}</select></div>
+          <div class="fl"><label>Гривны ₴</label><input type="number" placeholder="5000" value="${state.uah}" oninput="state.uah=this.value;render()"/></div>
+          <div class="fl"><label>Заметка</label><input type="text" placeholder="необязательно" value="${state.note}" oninput="state.note=this.value"/></div>
+        </div>
+        ${previewIn?`<div class="preview">
+          <span class="pv">${fmtN(parseFloat(state.uah))} ₴</span>
+          <span class="parr">÷</span><span class="pg">${getMono()}</span>
+          <span class="parr">=</span><span class="pv">${fmtN(previewIn.usd,4)} $</span>
+          <span class="parr">×</span><span class="pg">${getTinkoff()}</span>
+          <span class="parr">=</span><span class="pv-big">${fmtN(previewIn.rub)} ₽</span>
+        </div>`:""}
+        ${!ratesOk()?`<div style="font-size:10px;color:#e05c5c;margin-bottom:8px">⚠ Введи курсы вверху</div>`:""}
+        <button class="btn-add" onclick="addEntry()">+ Записать получение</button>
+      </div>
+      <div class="filter-bar">
+        <span class="filter-lbl">Период:</span>
+        ${monthSelectHtml(months, state.filterMonthIn, "state.filterMonthIn=this.value;render()")}
+        ${state.filterMonthIn?`<button class="filter-clear" onclick="state.filterMonthIn='';render()">× Сбросить</button>`:""}
+        <span style="font-size:10px;color:#bbb;margin-left:auto">${filtered.length} записей</span>
+      </div>
+      <div class="tbl-wrap">
+        <div class="tbl-hdr"><span class="tbl-hdr-t">История получений</span></div>
+        ${filtered.length===0?`<div class="empty">Нет записей</div>`:`
+          <div class="tbl-wrap-scroll">
+          <table class="tbl">
+            <thead><tr><th>Дата</th><th>От кого</th><th>Гривны</th><th>Цепочка</th><th>Рубли</th><th>Заметка</th><th></th></tr></thead>
+            <tbody>
+              ${filtered.map(e=>state.editingEntryId==e.id
+                ? editRowFn(e)
+                : `<tr>
+                    <td style="color:#aaa;white-space:nowrap">${fmt(e.date)}</td>
+                    <td style="white-space:nowrap">${EMOJI[e.sender]||""} ${e.sender}</td>
+                    <td style="white-space:nowrap">${fmtN(e.uah)} ₴</td>
+                    <td class="chain-cell">÷${e.monoRate} =${fmtN(e.usd,4)}$ ×${e.tinkoffRate}</td>
+                    <td style="font-weight:500;white-space:nowrap">${fmtN(e.rub)} ₽</td>
+                    <td style="color:#aaa">${e.note||"—"}</td>
+                    <td style="white-space:nowrap">
+                      <button class="edit-btn" onclick="startEditEntry('${e.id}')">✏</button>
+                      <button class="del-btn" onclick="delEntry('${e.id}')">×</button>
+                    </td>
+                  </tr>`
+              ).join("")}
+              ${summaryFn()}
+            </tbody>
+          </table>
+          </div>
+        `}
+      </div>
+    `;
+  }
+
+  function renderOutgoing(filtered, months, summaryFn, editRowFn, previewOut){
+    return `
+      <div class="form-box">
+        <div class="form-title">Записать перевод в рублях</div>
+        <div class="fg fg4">
+          <div class="fl"><label>Дата</label><input type="date" value="${state.payDate}" oninput="state.payDate=this.value"/></div>
+          <div class="fl"><label>Кому</label><select onchange="state.payTo=this.value">${SENDERS.map(s=>`<option${state.payTo===s?" selected":""}>${s}</option>`).join("")}</select></div>
+          <div class="fl"><label>Рубли ₽</label><input type="number" placeholder="3500" value="${state.payRub}" oninput="state.payRub=this.value;render()"/></div>
+          <div class="fl"><label>Заметка</label><input type="text" placeholder="необязательно" value="${state.payNote}" oninput="state.payNote=this.value"/></div>
+        </div>
+        ${previewOut?`<div class="preview">
+          <span class="pv">${fmtN(parseFloat(state.payRub))} ₽</span>
+          <span class="parr">÷</span><span class="pg">${getTinkoff()}</span>
+          <span class="parr">=</span><span class="pv">${fmtN(previewOut.usd,4)} $</span>
+          <span class="parr">×</span><span class="pg">${getMono()}</span>
+          <span class="parr">=</span><span class="pv-big">${fmtN(previewOut.uah)} ₴</span>
+          <span class="pg" style="margin-left:4px">получат</span>
+        </div>`:""}
+        <button class="btn-add green" onclick="addPayout()">✓ Записать перевод</button>
+      </div>
+      <div class="filter-bar">
+        <span class="filter-lbl">Период:</span>
+        ${monthSelectHtml(months, state.filterMonthOut, "state.filterMonthOut=this.value;render()")}
+        ${state.filterMonthOut?`<button class="filter-clear" onclick="state.filterMonthOut='';render()">× Сбросить</button>`:""}
+        <span style="font-size:10px;color:#bbb;margin-left:auto">${filtered.length} записей</span>
+      </div>
+      <div class="tbl-wrap">
+        <div class="tbl-hdr"><span class="tbl-hdr-t">История переводов</span></div>
+        ${filtered.length===0?`<div class="empty">Нет записей</div>`:`
+          <div class="tbl-wrap-scroll">
+          <table class="tbl">
+            <thead><tr><th>Дата</th><th>Кому</th><th>Рубли</th><th>Итог (долг)</th><th>≈ Гривны</th><th>Заметка</th><th></th></tr></thead>
+            <tbody>
+              ${filtered.map(p=>state.editingPayoutId==p.id
+                ? editRowFn(p)
+                : `<tr>
+                    <td style="color:#aaa;white-space:nowrap">${fmt(p.date)}</td>
+                    <td style="white-space:nowrap">${EMOJI[p.to]||""} ${p.to}</td>
+                    <td style="font-weight:500;white-space:nowrap">${fmtN(p.rub)} ₽</td>
+                    <td style="color:#aaa;font-size:10px">—</td>
+                    <td style="color:#aaa;white-space:nowrap">${fmtN(p.uah)} ₴</td>
+                    <td style="color:#aaa">${p.note||"—"}</td>
+                    <td style="white-space:nowrap">
+                      <button class="edit-btn" onclick="startEditPayout('${p.id}')">✏</button>
+                      <button class="del-btn" onclick="delPayout('${p.id}')">×</button>
+                    </td>
+                  </tr>`
+              ).join("")}
+              ${summaryFn()}
+            </tbody>
+          </table>
+          </div>
+        `}
+      </div>
+    `;
+  }
+}
+
+// ─── INIT ─────────────────────────────────────────────
+(async function init(){
+  loadLocal();
+  render();
+  document.getElementById("loading-overlay").style.display = "flex";
+  await syncFromSheet();
+  document.getElementById("loading-overlay").style.display = "none";
+})();
+</script>
+</body>
+</html>
