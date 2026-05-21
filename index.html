@@ -546,13 +546,13 @@ function render(){
       <div class="rate-row">
         <div class="rate-field">
           <label>Монобанк UAH/$</label>
-          <input type="number" placeholder="44" value="${state.monoRate}" oninput="state.monoRate=this.value;localStorage.setItem('monoRate',this.value);render()"/>
+          <input type="number" placeholder="44" value="${state.monoRate}" oninput="state.monoRate=this.value;localStorage.setItem('monoRate',this.value)" onchange="render()"/>
           <div style="font-size:9px;color:#bbb;margin-top:3px">₴ за 1 $</div>
         </div>
         <div class="rate-eq">÷ ×</div>
         <div class="rate-field">
           <label>Тинькофф USD/RUB</label>
-          <input type="number" placeholder="70" value="${state.tinkoffRate}" oninput="state.tinkoffRate=this.value;localStorage.setItem('tinkoffRate',this.value);render()"/>
+          <input type="number" placeholder="70" value="${state.tinkoffRate}" oninput="state.tinkoffRate=this.value;localStorage.setItem('tinkoffRate',this.value)" onchange="render()"/>
           <div style="font-size:9px;color:#bbb;margin-top:3px">₽ за 1 $</div>
         </div>
         <div class="rate-eq">=</div>
@@ -629,7 +629,7 @@ function render(){
         <div class="fg fg4">
           <div class="fl"><label>Дата</label><input type="date" value="${state.date}" oninput="state.date=this.value"/></div>
           <div class="fl"><label>От кого</label><select onchange="state.sender=this.value">${SENDERS.map(s=>`<option${state.sender===s?" selected":""}>${s}</option>`).join("")}</select></div>
-          <div class="fl"><label>Гривны ₴</label><input type="number" placeholder="5000" value="${state.uah}" oninput="state.uah=this.value;render()"/></div>
+          <div class="fl"><label>Гривны ₴</label><input type="number" placeholder="5000" value="${state.uah}" oninput="state.uah=this.value" onchange="render()"/></div>
           <div class="fl"><label>Заметка</label><input type="text" placeholder="необязательно" value="${state.note}" oninput="state.note=this.value"/></div>
         </div>
         ${previewIn?`<div class="preview">
@@ -686,7 +686,7 @@ function render(){
         <div class="fg fg4">
           <div class="fl"><label>Дата</label><input type="date" value="${state.payDate}" oninput="state.payDate=this.value"/></div>
           <div class="fl"><label>Кому</label><select onchange="state.payTo=this.value">${SENDERS.map(s=>`<option${state.payTo===s?" selected":""}>${s}</option>`).join("")}</select></div>
-          <div class="fl"><label>Рубли ₽</label><input type="number" placeholder="3500" value="${state.payRub}" oninput="state.payRub=this.value;render()"/></div>
+          <div class="fl"><label>Рубли ₽</label><input type="number" placeholder="3500" value="${state.payRub}" oninput="state.payRub=this.value" onchange="render()"/></div>
           <div class="fl"><label>Заметка</label><input type="text" placeholder="необязательно" value="${state.payNote}" oninput="state.payNote=this.value"/></div>
         </div>
         ${previewOut?`<div class="preview">
