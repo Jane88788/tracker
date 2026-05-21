@@ -238,9 +238,9 @@ async function syncFromSheet(){
     const res = await fetch(WEBHOOK + "?t=" + Date.now());
     const data = await res.json();
 
-    // incoming: [rowId, date, sender, uah, monoRate, usd, tinkoffRate, rub, note]
-    if(data.incoming && data.incoming.length){
-      state.entries = data.incoming.map(r=>({
+    // Always overwrite from sheet — respects deletions made directly in Google Sheets
+    if(data.incoming !== undefined){
+      state.entries = (data.incoming||[]).map(r=>({
         id:          String(r[0]||"").trim() || ("gs_"+Math.random()),
         date:        String(r[1]||"").trim(),
         sender:      String(r[2]||"").trim(),
@@ -253,9 +253,8 @@ async function syncFromSheet(){
       })).reverse();
     }
 
-    // outgoing: [rowId, date, to, rub, tinkoffRate, usd, monoRate, uah, note]
-    if(data.outgoing && data.outgoing.length){
-      state.payouts = data.outgoing.map(r=>({
+    if(data.outgoing !== undefined){
+      state.payouts = (data.outgoing||[]).map(r=>({
         id:          String(r[0]||"").trim() || ("gs_"+Math.random()),
         date:        String(r[1]||"").trim(),
         to:          String(r[2]||"").trim(),
@@ -473,7 +472,7 @@ function render(){
       const totalSent = state.payouts.filter(p=>g.members.includes(p.to)).reduce((a,p)=>a+p.rub,0);
       const debt = totalRub - totalSent;
       const cls = debt>0.01?"owe":debt<-0.01?"over":"paid";
-      const debtLabel = debt>0.01?`Я должна: ${fmtN(debt)} ₽`:debt<-0.01?`Мне должны: ${fmtN(Math.abs(debt))} ₽`:"✓ Расчёт закрыт";
+      const debtLabel = debt>0.01?`Женя должна: ${fmtN(debt)} ₽`:debt<-0.01?`Жене должны: ${fmtN(Math.abs(debt))} ₽`:"✓ Расчёт закрыт";
       const debtColor = debt>0.01?"#7a5800":debt<-0.01?"#0c5460":"#155724";
       return `<tr class="summary-row ${cls}">
         <td colspan="2">${g.emoji} ${g.label}</td>
@@ -495,7 +494,7 @@ function render(){
       const totalReceived = state.entries.filter(e=>g.members.includes(e.sender)).reduce((a,e)=>a+e.rub,0);
       const debt = totalReceived - totalRub;
       const cls = debt>0.01?"owe":debt<-0.01?"over":"paid";
-      const debtLabel = debt>0.01?`Ещё должна: ${fmtN(debt)} ₽`:debt<-0.01?`Переплата: ${fmtN(Math.abs(debt))} ₽`:"✓ Расчёт закрыт";
+      const debtLabel = debt>0.01?`Женя ещё должна: ${fmtN(debt)} ₽`:debt<-0.01?`Переплата: ${fmtN(Math.abs(debt))} ₽`:"✓ Расчёт закрыт";
       const debtColor = debt>0.01?"#7a5800":debt<-0.01?"#0c5460":"#155724";
       return `<tr class="summary-row ${cls}">
         <td colspan="2">${g.emoji} ${g.label}</td>
@@ -593,7 +592,7 @@ function render(){
         <div>
           <div class="tb-lbl">Общий долг</div>
           <div class="tb-val ${totalDebt>0.01?"owe":"clear"}">
-            ${totalDebt>0.01?`Я должна ${fmtN(totalDebt)} ₽`:totalDebt<-0.01?`Мне должны ${fmtN(Math.abs(totalDebt))} ₽`:"✓ Всё закрыто"}
+            ${totalDebt>0.01?`Женя должна ${fmtN(totalDebt)} ₽`:totalDebt<-0.01?`Жене должны ${fmtN(Math.abs(totalDebt))} ₽`:"✓ Всё закрыто"}
           </div>
         </div>
       </div>
@@ -602,9 +601,9 @@ function render(){
         return `<div class="gcard">
           <div class="gcard-title">${g.emoji} ${g.label}</div>
           <div class="grow"><span>Прислали</span><span>${fmtN(g.totalUah)} ₴ = ${fmtN(g.totalRubReceived)} ₽</span></div>
-          <div class="grow"><span>Ты перевела</span><span>${fmtN(g.totalRubSent)} ₽</span></div>
+          <div class="grow"><span>Женя перевела</span><span>${fmtN(g.totalRubSent)} ₽</span></div>
           <div class="gdebt ${cls}">
-            ${g.debt>0.01?`Я должна ${fmtN(g.debt)} ₽`:g.debt<-0.01?`Мне должны ${fmtN(Math.abs(g.debt))} ₽`:"✓ Расчёт закрыт"}
+            ${g.debt>0.01?`Женя должна ${fmtN(g.debt)} ₽`:g.debt<-0.01?`Жене должны ${fmtN(Math.abs(g.debt))} ₽`:"✓ Расчёт закрыт"}
           </div>
           ${g.members.length>1?`<div class="detail">
             ${g.members.map(m=>{
