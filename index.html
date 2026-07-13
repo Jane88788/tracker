@@ -195,6 +195,10 @@ function todayStr(){ return new Date().toISOString().split("T")[0]; }
 function fmt(d){
   if(!d) return "—";
   const s = String(d).trim();
+  // ISO format: 2026-05-19T21:00:00.000Z
+  if(s.includes("T") || s.includes("Z")){
+    return new Date(s).toLocaleDateString("ru-RU",{day:"2-digit",month:"2-digit",year:"2-digit"});
+  }
   // Google Sheets serial number (e.g. 46000)
   if(/^\d{4,6}$/.test(s)){
     const ms = (parseFloat(s) - 25569) * 86400 * 1000;
@@ -216,8 +220,10 @@ function fmtN(n,dec=2){ return Number(n).toLocaleString("ru-RU",{minimumFraction
 function parseDate(d){
   if(!d) return null;
   const s = String(d).trim();
+  // ISO format
+  if(s.includes("T") || s.includes("Z")) return new Date(s);
+  // Google Sheets serial
   if(/^[0-9]{4,6}$/.test(s)){
-    // Google Sheets serial
     const ms = (parseFloat(s) - 25569) * 86400 * 1000;
     return new Date(ms);
   }
@@ -233,6 +239,10 @@ function parseDate(d){
 function monthKey(d){
   if(!d) return "";
   const s = String(d).trim();
+  if(s.includes("T") || s.includes("Z")){
+    const dt = new Date(s);
+    return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,"0")}`;
+  }
   if(/^[0-9]{4,6}$/.test(s)){
     const date = parseDate(s);
     const y = date.getFullYear();
@@ -630,73 +640,75 @@ function render(){
 
   // helper: month select
   function renderFeed(){
-    // Merge all events into one chronological list
-    const events = [
-      ...state.entries.map(e=>({
-        type:"in", date:e.date, dateRaw:e.date,
-        who:e.sender, rub:e.rub, uah:e.uah, note:e.note, id:e.id
-      })),
-      ...state.payouts.map(p=>({
-        type:"out", date:p.date, dateRaw:p.date,
-        who:p.to, rub:p.rub, uah:p.uah, note:p.note, id:p.id
-      }))
-    ].sort((a,b)=>{
-      // Sort by date descending
-      const da = parseDate(a.dateRaw)||new Date(0);
-      const db = parseDate(b.dateRaw)||new Date(0);
+    var events = [];
+    state.entries.forEach(function(e){
+      events.push({type:"in", dateRaw:e.date, who:e.sender, rub:e.rub, uah:e.uah, note:e.note});
+    });
+    state.payouts.forEach(function(p){
+      events.push({type:"out", dateRaw:p.date, who:p.to, rub:p.rub, uah:p.uah, note:p.note});
+    });
+    events.sort(function(a,b){
+      var da = parseDate(a.dateRaw)||new Date(0);
+      var db = parseDate(b.dateRaw)||new Date(0);
       return db-da;
     });
 
-    if(!events.length) return \`<div class="empty">Нет записей</div>\`;
+    if(!events.length) return '<div class="empty">Нет записей</div>';
 
-    // Running debt per group
-    const totalIn  = state.entries.reduce((a,e)=>a+e.rub,0);
-    const totalOut = state.payouts.reduce((a,p)=>a+p.rub,0);
-    const totalDebt = totalIn - totalOut;
-    const debtUah = effectiveRate ? totalDebt/effectiveRate : null;
+    var totalIn  = state.entries.reduce(function(a,e){return a+e.rub;},0);
+    var totalOut = state.payouts.reduce(function(a,p){return a+p.rub;},0);
+    var totalDebt = totalIn - totalOut;
+    var debtUah = effectiveRate ? totalDebt/effectiveRate : null;
 
-    const rows = events.map(ev=>{
-      const isIn = ev.type==="in";
-      const emoji = EMOJI[ev.who]||"";
-      const dateStr = fmt(ev.dateRaw);
-      const icon = isIn ? "📩" : "📤";
-      const action = isIn
-        ? \`\${emoji} \${ev.who} перевёл(а) Жене\`
-        : \`Женя перевела \${emoji} \${ev.who}\`;
-      const amount = isIn
-        ? \`+\${fmtN(ev.rub)} ₽ / \${fmtN(ev.uah)} ₴\`
-        : \`−\${fmtN(ev.rub)} ₽ / \${fmtN(ev.uah)} ₴\`;
-      const amtColor = isIn ? "#1d5c38" : "#7a5800";
-      return \`<div style="padding:12px 16px;border-bottom:1px solid #f0ede8;">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
-          <div>
-            <div style="font-size:10px;color:#aaa;margin-bottom:3px">\${icon} \${dateStr}</div>
-            <div style="font-size:14px;font-weight:500">\${action}</div>
-            \${ev.note ? \`<div style="font-size:11px;color:#aaa;margin-top:2px">\${ev.note}</div>\` : ""}
-          </div>
-          <div style="text-align:right;white-space:nowrap">
-            <div style="font-size:15px;font-weight:600;color:\${amtColor}">\${amount}</div>
-          </div>
-        </div>
-      </div>\`;
+    var rows = events.map(function(ev){
+      var isIn = ev.type==="in";
+      var emoji = EMOJI[ev.who]||"";
+      var dateStr = fmt(ev.dateRaw);
+      var icon = isIn ? "📩" : "📤";
+      var action = isIn
+        ? (emoji+" "+ev.who+" перевёл(а) Жене")
+        : ("Женя перевела "+emoji+" "+ev.who);
+      var amountRub = fmtN(ev.rub)+" ₽";
+      var amountUah = fmtN(ev.uah)+" ₴";
+      var sign = isIn ? "+" : "−";
+      var amtColor = isIn ? "#1d5c38" : "#7a5800";
+      var noteHtml = ev.note ? ('<div style="font-size:11px;color:#aaa;margin-top:2px">'+ev.note+'</div>') : "";
+      return '<div style="padding:12px 16px;border-bottom:1px solid #f0ede8;">'
+        +'<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">'
+        +'<div>'
+        +'<div style="font-size:10px;color:#aaa;margin-bottom:3px">'+icon+' '+dateStr+'</div>'
+        +'<div style="font-size:14px;font-weight:500">'+action+'</div>'
+        +noteHtml
+        +'</div>'
+        +'<div style="text-align:right;white-space:nowrap">'
+        +'<div style="font-size:15px;font-weight:600;color:'+amtColor+'">'+sign+amountRub+'</div>'
+        +'<div style="font-size:11px;color:#aaa">'+amountUah+'</div>'
+        +'</div>'
+        +'</div>'
+        +'</div>';
     }).join("");
 
-    const debtLabel = totalDebt>0.01
-      ? \`Женя должна: <strong>\${fmtN(totalDebt)} ₽\${debtUah ? " / "+fmtN(debtUah,0)+" ₴" : ""}</strong>\`
-      : totalDebt<-0.01
-      ? \`Жене должны: <strong>\${fmtN(Math.abs(totalDebt))} ₽\${debtUah ? " / "+fmtN(Math.abs(debtUah),0)+" ₴" : ""}</strong>\`
-      : "<strong>✓ Все расчёты закрыты</strong>";
-    const debtCls = totalDebt>0.01?"owe":totalDebt<-0.01?"over":"paid";
+    var debtRub = fmtN(Math.abs(totalDebt))+" ₽";
+    var debtUahStr = debtUah ? (" / "+fmtN(Math.abs(debtUah),0)+" ₴") : "";
+    var debtLabel, debtCls;
+    if(totalDebt>0.01){
+      debtLabel = "Женя должна: <strong>"+debtRub+debtUahStr+"</strong>";
+      debtCls = "owe";
+    } else if(totalDebt<-0.01){
+      debtLabel = "Жене должны: <strong>"+debtRub+debtUahStr+"</strong>";
+      debtCls = "over";
+    } else {
+      debtLabel = "<strong>✓ Все расчёты закрыты</strong>";
+      debtCls = "paid";
+    }
 
-    return \`
-      <div class="tbl-wrap" style="margin-bottom:12px">
-        <div class="tbl-hdr"><span class="tbl-hdr-t">Все переводы</span><span style="font-size:10px;color:#bbb">\${events.length} событий</span></div>
-        \${rows}
-      </div>
-      <div class="gdebt \${debtCls}" style="font-size:15px;text-align:center;padding:14px">
-        \${debtLabel}
-      </div>
-    \`;
+    return '<div class="tbl-wrap" style="margin-bottom:12px">'
+      +'<div class="tbl-hdr"><span class="tbl-hdr-t">Все переводы</span><span style="font-size:10px;color:#bbb">'+events.length+' событий</span></div>'
+      +rows
+      +'</div>'
+      +'<div class="gdebt '+debtCls+'" style="font-size:15px;text-align:center;padding:14px">'
+      +debtLabel
+      +'</div>';
   }
 
   function renderSummary(gStats, sStats, totalDebt, effectiveRate){
@@ -872,7 +884,7 @@ function render(){
   loadLocal();
   render();
   document.getElementById("loading-overlay").style.display = "flex";
-  await syncFromSheet();
+  try { await syncFromSheet(); } catch(e) { console.error(e); }
   document.getElementById("loading-overlay").style.display = "none";
 })();
 </script>
