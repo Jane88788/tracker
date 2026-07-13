@@ -640,73 +640,83 @@ function render(){
 
   // helper: month select
   function renderFeed(){
-    var events = [];
-    state.entries.forEach(function(e){
-      events.push({type:"in", dateRaw:e.date, who:e.sender, rub:e.rub, uah:e.uah, note:e.note});
-    });
-    state.payouts.forEach(function(p){
-      events.push({type:"out", dateRaw:p.date, who:p.to, rub:p.rub, uah:p.uah, note:p.note});
-    });
-    events.sort(function(a,b){
-      var da = parseDate(a.dateRaw)||new Date(0);
-      var db = parseDate(b.dateRaw)||new Date(0);
-      return da-db; // ascending — oldest first
-    });
+    var FEED_GROUPS = [
+      {label:"👨‍👩 Родители", members:["Мама","Папа"]},
+      {label:"👴👵 Бабушка и Дедушка", members:["Бабушка","Дедушка"]},
+      {label:"🤝 Другие", members:["Другие"]},
+    ];
 
-    if(!events.length) return '<div class="empty">Нет записей</div>';
+    var VERB = {"Мама":"Мама перевела","Папа":"Папа перевёл","Бабушка":"Бабушка перевела","Дедушка":"Дедушка перевёл","Другие":"Другие перевели"};
 
-    // Compute running balance after each event (oldest→newest)
-    var running = 0;
-    var rows = events.map(function(ev){
-      var isIn = ev.type==="in";
-      if(isIn) running += ev.rub;
-      else running -= ev.rub;
+    function groupHtml(g){
+      var events = [];
+      state.entries.filter(function(e){return g.members.includes(e.sender);}).forEach(function(e){
+        events.push({type:"in", dateRaw:e.date, who:e.sender, rub:e.rub, uah:e.uah, note:e.note});
+      });
+      state.payouts.filter(function(p){return g.members.includes(p.to);}).forEach(function(p){
+        events.push({type:"out", dateRaw:p.date, who:p.to, rub:p.rub, uah:p.uah, note:p.note});
+      });
+      if(!events.length) return "";
 
-      var emoji = EMOJI[ev.who]||"";
-      var dateStr = fmt(ev.dateRaw);
-      var action = isIn
-        ? (emoji+" "+{"Мама":"Мама перевела","Папа":"Папа перевёл","Бабушка":"Бабушка перевела","Дедушка":"Дедушка перевёл","Другие":"Другие перевели"}[ev.who]+" Жене "+fmtN(ev.rub)+" ₽ / "+fmtN(ev.uah)+" ₴")
-        : ("Женя перевела "+emoji+" "+ev.who+" — "+fmtN(ev.rub)+" ₽ / "+fmtN(ev.uah)+" ₴");
-      var amtColor = isIn ? "#1d5c38" : "#7a5800";
-      var noteHtml = ev.note ? ('<div style="font-size:11px;color:#888;margin-top:2px;font-style:italic">'+ev.note+'</div>') : "";
+      events.sort(function(a,b){
+        var da = parseDate(a.dateRaw)||new Date(0);
+        var db = parseDate(b.dateRaw)||new Date(0);
+        return da-db;
+      });
 
-      var balLabel, balCls, balColor;
-      if(running>0.01){
-        balLabel = "→ Женя должна: "+fmtN(running)+" ₽"+(effectiveRate?" / "+fmtN(running/effectiveRate,0)+" ₴":"");
-        balColor = "#7a5800"; balCls = "#fff3cd";
-      } else if(running<-0.01){
-        balLabel = "→ Жене должны: "+fmtN(Math.abs(running))+" ₽"+(effectiveRate?" / "+fmtN(Math.abs(running)/effectiveRate,0)+" ₴":"");
-        balColor = "#0c5460"; balCls = "#d1ecf1";
-      } else {
-        balLabel = "→ ✓ Расчёт закрыт";
-        balColor = "#155724"; balCls = "#d4edda";
-      }
+      var running = 0;
+      var rows = events.map(function(ev){
+        var isIn = ev.type==="in";
+        if(isIn) running += ev.rub; else running -= ev.rub;
+        var emoji = EMOJI[ev.who]||"";
+        var dateStr = fmt(ev.dateRaw);
+        var action = isIn
+          ? (VERB[ev.who]+" Жене "+fmtN(ev.rub)+" ₽ / "+fmtN(ev.uah)+" ₴")
+          : ("Женя перевела "+emoji+" "+ev.who+" — "+fmtN(ev.rub)+" ₽ / "+fmtN(ev.uah)+" ₴");
+        var amtColor = isIn ? "#1d5c38" : "#7a5800";
+        var noteHtml = ev.note ? ('<div style="font-size:11px;color:#888;margin-top:2px;font-style:italic">'+ev.note+'</div>') : "";
 
-      return '<div style="padding:14px 16px;border-bottom:1.5px solid #f0ede8;">'
-        +'<div style="font-size:10px;color:#aaa;margin-bottom:4px">'+dateStr+'</div>'
-        +'<div style="font-size:14px;font-weight:500;color:'+amtColor+'">'+action+'</div>'
-        +noteHtml
-        +'<div style="margin-top:8px;font-size:12px;font-weight:500;color:'+balColor+';background:'+balCls+';padding:5px 10px;border-radius:5px;display:inline-block">'+balLabel+'</div>'
+        var balLabel, balColor, balBg;
+        if(running>0.01){
+          balLabel = "→ Женя должна: "+fmtN(running)+" ₽"+(effectiveRate?" / "+fmtN(running/effectiveRate,0)+" ₴":"");
+          balColor="#7a5800"; balBg="#fff3cd";
+        } else if(running<-0.01){
+          balLabel = "→ Жене должны: "+fmtN(Math.abs(running))+" ₽"+(effectiveRate?" / "+fmtN(Math.abs(running)/effectiveRate,0)+" ₴":"");
+          balColor="#0c5460"; balBg="#d1ecf1";
+        } else {
+          balLabel = "→ ✓ Расчёт закрыт";
+          balColor="#155724"; balBg="#d4edda";
+        }
+
+        return '<div style="padding:12px 16px;border-bottom:1px solid #f0ede8;">'
+          +'<div style="font-size:10px;color:#aaa;margin-bottom:3px">'+dateStr+'</div>'
+          +'<div style="font-size:13px;font-weight:500;color:'+amtColor+'">'+action+'</div>'
+          +noteHtml
+          +'<div style="margin-top:7px;font-size:12px;font-weight:500;color:'+balColor+';background:'+balBg+';padding:5px 10px;border-radius:5px;display:inline-block">'+balLabel+'</div>'
+          +'</div>';
+      }).reverse().join("");
+
+      var totalIn  = state.entries.filter(function(e){return g.members.includes(e.sender);}).reduce(function(a,e){return a+e.rub;},0);
+      var totalOut = state.payouts.filter(function(p){return g.members.includes(p.to);}).reduce(function(a,p){return a+p.rub;},0);
+      var debt = totalIn - totalOut;
+      var debtRub = fmtN(Math.abs(debt))+" ₽";
+      var debtUahStr = effectiveRate ? (" / "+fmtN(Math.abs(debt)/effectiveRate,0)+" ₴") : "";
+      var debtLabel, debtCls;
+      if(debt>0.01){ debtLabel="Женя должна: <strong>"+debtRub+debtUahStr+"</strong>"; debtCls="owe"; }
+      else if(debt<-0.01){ debtLabel="Жене должны: <strong>"+debtRub+debtUahStr+"</strong>"; debtCls="over"; }
+      else { debtLabel="<strong>✓ Расчёт закрыт</strong>"; debtCls="paid"; }
+
+      return '<div style="margin-bottom:14px">'
+        +'<div style="font-family:Unbounded,sans-serif;font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#aaa;padding:10px 16px 4px">'+g.label+'</div>'
+        +'<div class="gdebt '+debtCls+'" style="margin:0 0 0 0;border-radius:0;font-size:13px;padding:10px 16px">'+debtLabel+'</div>'
+        +'<div class="tbl-wrap" style="border-radius:0 0 10px 10px;border-top:none">'+rows+'</div>'
         +'</div>';
-    }).reverse().join(""); // show newest first visually
+    }
 
-    // Final total
-    var totalIn  = state.entries.reduce(function(a,e){return a+e.rub;},0);
-    var totalOut = state.payouts.reduce(function(a,p){return a+p.rub;},0);
-    var totalDebt = totalIn - totalOut;
-    var debtUah = effectiveRate ? totalDebt/effectiveRate : null;
-    var debtRub = fmtN(Math.abs(totalDebt))+" ₽";
-    var debtUahStr = debtUah ? (" / "+fmtN(Math.abs(debtUah),0)+" ₴") : "";
-    var debtLabel, debtCls;
-    if(totalDebt>0.01){ debtLabel="Женя должна: <strong>"+debtRub+debtUahStr+"</strong>"; debtCls="owe"; }
-    else if(totalDebt<-0.01){ debtLabel="Жене должны: <strong>"+debtRub+debtUahStr+"</strong>"; debtCls="over"; }
-    else { debtLabel="<strong>✓ Все расчёты закрыты</strong>"; debtCls="paid"; }
+    var hasAny = state.entries.length>0||state.payouts.length>0;
+    if(!hasAny) return '<div class="empty">Нет записей</div>';
 
-    return '<div class="gdebt '+debtCls+'" style="font-size:15px;text-align:center;padding:14px;margin-bottom:12px">'+debtLabel+'</div>'
-      +'<div class="tbl-wrap">'
-      +'<div class="tbl-hdr"><span class="tbl-hdr-t">История переводов</span><span style="font-size:10px;color:#bbb">'+events.length+' событий</span></div>'
-      +rows
-      +'</div>';
+    return FEED_GROUPS.map(function(g){return groupHtml(g);}).join("");
   }
 
   function renderSummary(gStats, sStats, totalDebt, effectiveRate){
