@@ -194,19 +194,58 @@ let state = {
 function todayStr(){ return new Date().toISOString().split("T")[0]; }
 function fmt(d){
   if(!d) return "—";
-  // Handle dd.mm.yy or dd.mm.yyyy from Google Sheets
-  if(String(d).includes(".")){
-    const parts = String(d).split(".");
+  const s = String(d).trim();
+  // Google Sheets serial number (e.g. 46000)
+  if(/^\d{4,6}$/.test(s)){
+    const ms = (parseFloat(s) - 25569) * 86400 * 1000;
+    return new Date(ms).toLocaleDateString("ru-RU",{day:"2-digit",month:"2-digit",year:"2-digit"});
+  }
+  // dd.mm.yy or dd.mm.yyyy
+  if(s.includes(".")){
+    const parts = s.split(".");
     if(parts.length===3){
       const day=parts[0], mon=parts[1], yr=parts[2];
       const fullYr = yr.length===2 ? "20"+yr : yr;
       return new Date(`${fullYr}-${mon}-${day}T12:00:00`).toLocaleDateString("ru-RU",{day:"2-digit",month:"2-digit",year:"2-digit"});
     }
   }
-  return new Date(d+"T12:00:00").toLocaleDateString("ru-RU",{day:"2-digit",month:"2-digit",year:"2-digit"});
+  // yyyy-mm-dd
+  return new Date(s+"T12:00:00").toLocaleDateString("ru-RU",{day:"2-digit",month:"2-digit",year:"2-digit"});
 }
 function fmtN(n,dec=2){ return Number(n).toLocaleString("ru-RU",{minimumFractionDigits:dec,maximumFractionDigits:dec}); }
-function monthKey(d){ return d ? String(d).slice(0,7) : ""; }
+function parseDate(d){
+  if(!d) return null;
+  const s = String(d).trim();
+  if(/^[0-9]{4,6}$/.test(s)){
+    // Google Sheets serial
+    const ms = (parseFloat(s) - 25569) * 86400 * 1000;
+    return new Date(ms);
+  }
+  if(s.includes(".")){
+    const parts = s.split(".");
+    if(parts.length===3){
+      const fullYr = parts[2].length===2 ? "20"+parts[2] : parts[2];
+      return new Date(`${fullYr}-${parts[1]}-${parts[0]}T12:00:00`);
+    }
+  }
+  return new Date(s+"T12:00:00");
+}
+function monthKey(d){
+  if(!d) return "";
+  const s = String(d).trim();
+  if(/^[0-9]{4,6}$/.test(s)){
+    const date = parseDate(s);
+    const y = date.getFullYear();
+    const m = String(date.getMonth()+1).padStart(2,"0");
+    return `${y}-${m}`;
+  }
+  if(s.includes(".")) {
+    const parts = s.split(".");
+    const fullYr = parts[2].length===2 ? "20"+parts[2] : parts[2];
+    return `${fullYr}-${parts[1]}`;
+  }
+  return s.slice(0,7);
+}
 function monthLabel(k){
   if(!k) return "";
   const [y,m] = k.split("-");
@@ -578,17 +617,88 @@ function render(){
 
     <!-- Tabs -->
     <div class="tabs">
-      ${[["summary","📊 Итого"],["incoming","📥 Получения"],["outgoing","📤 Переводы"]].map(([k,l])=>
+      ${[["feed","📋 Лента"],["summary","📊 Итого"],["incoming","📥 Получения"],["outgoing","📤 Переводы"]].map(([k,l])=>
         `<button class="tab-btn${state.tab===k?" active":""}" onclick="state.tab='${k}';render()">${l}</button>`
       ).join("")}
     </div>
 
+    ${state.tab==="feed" ? renderFeed() : ""}
     ${state.tab==="summary" ? renderSummary(gStats, sStats, totalDebt, effectiveRate) : ""}
     ${state.tab==="incoming" ? renderIncoming(filteredEntries, monthsIn, incomingSummaryRows, editEntryRowHtml, previewIn) : ""}
     ${state.tab==="outgoing" ? renderOutgoing(filteredPayouts, monthsOut, outgoingSummaryRows, editPayoutRowHtml, previewOut) : ""}
   `;
 
   // helper: month select
+  function renderFeed(){
+    // Merge all events into one chronological list
+    const events = [
+      ...state.entries.map(e=>({
+        type:"in", date:e.date, dateRaw:e.date,
+        who:e.sender, rub:e.rub, uah:e.uah, note:e.note, id:e.id
+      })),
+      ...state.payouts.map(p=>({
+        type:"out", date:p.date, dateRaw:p.date,
+        who:p.to, rub:p.rub, uah:p.uah, note:p.note, id:p.id
+      }))
+    ].sort((a,b)=>{
+      // Sort by date descending
+      const da = parseDate(a.dateRaw)||new Date(0);
+      const db = parseDate(b.dateRaw)||new Date(0);
+      return db-da;
+    });
+
+    if(!events.length) return \`<div class="empty">Нет записей</div>\`;
+
+    // Running debt per group
+    const totalIn  = state.entries.reduce((a,e)=>a+e.rub,0);
+    const totalOut = state.payouts.reduce((a,p)=>a+p.rub,0);
+    const totalDebt = totalIn - totalOut;
+    const debtUah = effectiveRate ? totalDebt/effectiveRate : null;
+
+    const rows = events.map(ev=>{
+      const isIn = ev.type==="in";
+      const emoji = EMOJI[ev.who]||"";
+      const dateStr = fmt(ev.dateRaw);
+      const icon = isIn ? "📩" : "📤";
+      const action = isIn
+        ? \`\${emoji} \${ev.who} перевёл(а) Жене\`
+        : \`Женя перевела \${emoji} \${ev.who}\`;
+      const amount = isIn
+        ? \`+\${fmtN(ev.rub)} ₽ / \${fmtN(ev.uah)} ₴\`
+        : \`−\${fmtN(ev.rub)} ₽ / \${fmtN(ev.uah)} ₴\`;
+      const amtColor = isIn ? "#1d5c38" : "#7a5800";
+      return \`<div style="padding:12px 16px;border-bottom:1px solid #f0ede8;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+          <div>
+            <div style="font-size:10px;color:#aaa;margin-bottom:3px">\${icon} \${dateStr}</div>
+            <div style="font-size:14px;font-weight:500">\${action}</div>
+            \${ev.note ? \`<div style="font-size:11px;color:#aaa;margin-top:2px">\${ev.note}</div>\` : ""}
+          </div>
+          <div style="text-align:right;white-space:nowrap">
+            <div style="font-size:15px;font-weight:600;color:\${amtColor}">\${amount}</div>
+          </div>
+        </div>
+      </div>\`;
+    }).join("");
+
+    const debtLabel = totalDebt>0.01
+      ? \`Женя должна: <strong>\${fmtN(totalDebt)} ₽\${debtUah ? " / "+fmtN(debtUah,0)+" ₴" : ""}</strong>\`
+      : totalDebt<-0.01
+      ? \`Жене должны: <strong>\${fmtN(Math.abs(totalDebt))} ₽\${debtUah ? " / "+fmtN(Math.abs(debtUah),0)+" ₴" : ""}</strong>\`
+      : "<strong>✓ Все расчёты закрыты</strong>";
+    const debtCls = totalDebt>0.01?"owe":totalDebt<-0.01?"over":"paid";
+
+    return \`
+      <div class="tbl-wrap" style="margin-bottom:12px">
+        <div class="tbl-hdr"><span class="tbl-hdr-t">Все переводы</span><span style="font-size:10px;color:#bbb">\${events.length} событий</span></div>
+        \${rows}
+      </div>
+      <div class="gdebt \${debtCls}" style="font-size:15px;text-align:center;padding:14px">
+        \${debtLabel}
+      </div>
+    \`;
+  }
+
   function renderSummary(gStats, sStats, totalDebt, effectiveRate){
     if(!gStats.length) return `<div class="empty">Нет данных — добавь получения или нажми «Обновить» вверху</div>`;
     return `
